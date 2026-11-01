@@ -9,6 +9,7 @@ desc: >-
   无第三方依赖、不联网、不写数据库。
 version: 0.1.2
 author: ayue
+repo: https://github.com/AskskyLong/astrbot_plugin_cost_board
 astrbot_version: ">=4.25.0"
 tags:
   - 工具
