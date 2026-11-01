@@ -1,0 +1,17 @@
+name: astrbot_plugin_cost_board
+display_name: AI 费用看板 (Cost Board)
+short_desc: 把 provider_stats 的 token 换算成人民币，按天/模型/会话拆账，看清谁在烧钱
+desc: >-
+  AstrBot 只记 token，不记钱，模型后台的账单看不出是哪个群、哪个会话花掉的。
+  本插件直接读 data_v4.db 的 provider_stats（只读），用可配置的价格表换算成人民币，
+  一条指令给出今日 / 7 天 / 30 天花费、按模型占比、最烧钱的会话、缓存命中率。
+  命令：/费用 或 /费用 天。默认仅管理员可用。
+  无第三方依赖、不联网、不写数据库。
+version: 0.1.2
+author: ayue
+astrbot_version: ">=4.25.0"
+tags:
+  - 工具
+  - 成本
+  - 计费
+  - 统计
