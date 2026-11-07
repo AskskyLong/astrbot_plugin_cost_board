@@ -116,6 +116,28 @@ check("runs", agg.runs, 3)
 # 12:00 北京 = 峰时，未命中输入 1M tokens 应为 ¥2.00
 check("峰时 1M 未命中", round(agg.cost, 4), 2.0)
 
+# ---------------- 4b. 逐日渲染：缺的日子必须写「无记录」 ----------------
+class _FakeBoard(cb.CostBoard):
+    """不查库，直接给固定行，专测渲染。"""
+    def __init__(self, rows):
+        super().__init__(None, {})
+        self.db = ""
+        self._rows_fixed = rows
+
+    def _rows(self, since):
+        return self._rows_fixed
+
+
+today = dt.datetime.now(cb.BJ)
+yday = today - dt.timedelta(days=1)
+fmt = lambda d: d.astimezone(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+fb = _FakeBoard([dict(created_at=fmt(today), umo="u1", conversation_id="c1",
+                      provider_model="deepseek-flash", token_input_other=1000,
+                      token_input_cached=0, token_output=0)])
+txt = fb._daily(3)
+check("缺的日子写无记录", txt.count("无记录（未统计，不等于没花）") >= 1, True)
+check("不出现 ¥0.0000", "¥0.0000" not in txt, True)
+
 # ---------------- 5. 新鲜度：真库只读检查 ----------------
 # 不依赖 astrbot 的路径模块，直接找本机常见位置（只读打开）
 _cands = [r"F:\apps\astrbot\data\data_v4.db"]
