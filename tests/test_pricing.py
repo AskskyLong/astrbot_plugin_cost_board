@@ -125,7 +125,9 @@ class _FakeBoard(cb.CostBoard):
         self._rows_fixed = rows
 
     def _rows(self, since):
-        return self._rows_fixed
+        # 必须按 since 过滤，否则「今日」那行会被历史数据污染，测出来的结论是假的。
+        return [r for r in self._rows_fixed
+                if (cb._to_bj(r["created_at"]) or dt.datetime.min.replace(tzinfo=cb.BJ)) >= since]
 
 
 today = dt.datetime.now(cb.BJ)
@@ -137,6 +139,32 @@ fb = _FakeBoard([dict(created_at=fmt(today), umo="u1", conversation_id="c1",
 txt = fb._daily(3)
 check("缺的日子写无记录", txt.count("无记录（未统计，不等于没花）") >= 1, True)
 check("不出现 ¥0.0000", "¥0.0000" not in txt, True)
+
+# ---------------- 4c. 总览：0 行也必须写「无记录」，不能写 ¥0.0000 ----------------
+# 这是 11-07 午间做渲染 A/B 时抓到的：逐日表改了，总览还在渲染 ¥0.0000。
+empty = _FakeBoard([])
+empty._last_write = lambda: (None, -1.0)
+rep = empty._report()
+check("总览 0 行不写 ¥0.0000", "¥0.0000" not in rep, True)
+check("总览 0 行写无记录", rep.count("无记录") >= 3, True)
+
+# 有历史数据但今天没有：今日那行也得是「无记录」，不能是 ¥0.0000
+only_yday = _FakeBoard([dict(created_at=fmt(yday), umo="u1", conversation_id="c1",
+                             provider_model="deepseek-flash", token_input_other=1000,
+                             token_input_cached=0, token_output=0)])
+only_yday._last_write = lambda: (yday, 24.0)
+rep2 = only_yday._report()
+tline = [x for x in rep2.splitlines() if x.startswith("今日")]
+check("今日无行 -> 无记录", bool(tline) and "无记录" in tline[0], True)
+
+# ---------------- 4d. 免费模型在按模型表里不显示 ¥0.0000 ----------------
+free_only = _FakeBoard([dict(created_at=fmt(today), umo="u1", conversation_id="c1",
+                             provider_model="qwen3:14b-ctx32k", token_input_other=5000,
+                             token_input_cached=0, token_output=0)])
+free_only._last_write = lambda: (today, 1.0)
+rep3 = free_only._report()
+check("免费模型标注", "免费(本地)" in rep3, True)
+check("免费模型不渲染 0.0000", "¥0.0000" not in rep3, True)
 
 # ---------------- 5. 新鲜度：真库只读检查 ----------------
 # 不依赖 astrbot 的路径模块，直接找本机常见位置（只读打开）

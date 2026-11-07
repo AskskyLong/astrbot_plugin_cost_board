@@ -88,6 +88,12 @@ def _price_of(model: str, when: dt.datetime, prices: list[dict]) -> tuple[float,
 
 
 def _fmt_money(v: float) -> str:
+    # 真 0 元和「缺数据」必须长得不一样：缺数据由「无记录」表达，
+    # 这里绝不输出 ¥0.0000 —— 那是最容易让人误以为「今天没花钱」的一种写法。
+    if v == 0:
+        return "¥0"
+    if v < 0.0001:
+        return "<¥0.0001"
     if v >= 1:
         return f"¥{v:.2f}"
     if v >= 0.01:
@@ -144,7 +150,7 @@ class _Agg:
     PLUGIN_NAME,
     "ayue",
     "AI 费用看板：把 provider_stats 的 token 换算成人民币，按天/模型/会话拆账",
-    "v0.1.3",
+    "v0.1.4",
 )
 class CostBoard(Star):
     def __init__(self, context: Context, config: dict | None = None) -> None:
@@ -244,7 +250,12 @@ class CostBoard(Star):
             L.append(f"统计最后更新 {max(age, 0):.1f} 小时前（{last:%m-%d %H:%M}）")
         for k in ("今日", "7 天", "30 天"):
             a = aggs[k]
-            L.append(f"{k:<4}{_fmt_money(a.cost):>10}   {a.runs} 次")
+            # 0 行不等于 0 元：provider_stats 会整段漏记（11-03/04/05 就是空的），
+            # 把缺失渲染成 ¥0.0000 会让人以为「今天没花钱」。缺失就说缺失。
+            if a.runs == 0:
+                L.append(f"{k:<4}{'无记录':>10}   0 次")
+            else:
+                L.append(f"{k:<4}{_fmt_money(a.cost):>10}   {a.runs} 次")
         if a30.runs == 0:
             L.append("")
             L.append("这段时间没有调用记录。")
@@ -253,7 +264,9 @@ class CostBoard(Star):
         L.append("")
         L.append("按模型（30 天）")
         for model, cost in sorted(a30.models.items(), key=lambda x: -x[1])[:4]:
-            L.append(f"  {_short(model, 22):<24}{_fmt_money(cost):>9}")
+            # 本地模型是真 0 元，不是缺价；写 ¥0.0000 会跟「未配价」混淆。
+            money = "免费(本地)" if (cost == 0 and model in a30.free) else _fmt_money(cost)
+            L.append(f"  {_short(model, 22):<24}{money:>9}")
 
         L.append("")
         L.append("最烧钱的会话（30 天）")
